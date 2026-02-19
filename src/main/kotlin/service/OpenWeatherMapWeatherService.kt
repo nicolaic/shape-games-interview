@@ -11,6 +11,8 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.server.plugins.di.annotations.*
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonIgnoreUnknownKeys
@@ -25,20 +27,25 @@ val OPEN_WEATHER_MAP_API_FORECAST_URL = URLBuilder(OPEN_WEATHER_MAP_API_BASE_URL
 class OpenWeatherMapWeatherService(
     @Property("openWeatherMap.apiKey")
     private val apiKey: String,
+    @Property("openWeatherMap.concurrency")
+    private val concurrency: Int = 10,
     private val client: HttpClient,
 ) : WeatherService {
+    private val semaphore = Semaphore(concurrency)
 
     override suspend fun getForecast(
         location: String,
         unit: TemperatureUnit,
     ): WeatherForecast {
-        val forecast = client.get(OPEN_WEATHER_MAP_API_FORECAST_URL) {
-            accept(ContentType.Application.Json)
+        val forecast = semaphore.withPermit {
+            client.get(OPEN_WEATHER_MAP_API_FORECAST_URL) {
+                accept(ContentType.Application.Json)
 
-            parameter("appid", apiKey)
-            parameter("units", mapToOpenWeatherMapUnits(unit))
-            parameter("id", location)
-        }.body<ForecastResponse>()
+                parameter("appid", apiKey)
+                parameter("units", mapToOpenWeatherMapUnits(unit))
+                parameter("id", location)
+            }.body<ForecastResponse>()
+        }
 
         return forecast.toDomainModel()
     }
