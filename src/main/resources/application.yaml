@@ -1,0 +1,9 @@
+ktor:
+  application:
+    modules:
+      - dev.nicolai.weather.ApplicationKt.module
+  deployment:
+    port: 8080
+
+openWeatherMap:
+  apiKey: $OPEN_WEATHER_MAP_API_KEY
