@@ -14,8 +14,8 @@ typealias RedisWeatherForecastLoader =
 
 @OptIn(ExperimentalLettuceCoroutinesApi::class)
 class RedisCachingWeatherService(
-    private val loader: RedisWeatherForecastLoader,
     redis: RedisClient,
+    private val loader: RedisWeatherForecastLoader,
 ) : WeatherService {
     private val commands = redis.connect().coroutines()
 

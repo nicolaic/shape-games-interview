@@ -5,14 +5,17 @@ import dev.nicolai.weather.routes.byLocation
 import dev.nicolai.weather.routes.summary
 import dev.nicolai.weather.service.MemoryCachingWeatherService
 import dev.nicolai.weather.service.OpenWeatherMapWeatherService
+import dev.nicolai.weather.service.RedisCachingWeatherService
 import dev.nicolai.weather.service.WeatherService
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
+import io.ktor.server.config.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.di.*
 import io.ktor.server.routing.*
+import io.lettuce.core.RedisClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -52,6 +55,8 @@ fun Application.configureSerialization() {
 }
 
 fun Application.configureDependencies() {
+    val redisUrl = property<String>("redis.url")
+
     dependencies {
         provide<HttpClient> {
             HttpClient(CIO) {
@@ -61,14 +66,29 @@ fun Application.configureDependencies() {
             }
         }
 
+        provide<RedisClient> { RedisClient.create(redisUrl) }
+
         provide(OpenWeatherMapWeatherService::class)
+
+        provide<RedisCachingWeatherService> {
+            val redis = resolve<RedisClient>()
+            val service = resolve<OpenWeatherMapWeatherService>()
+
+            RedisCachingWeatherService(redis) { location, unit ->
+                val forecast = service.getForecast(location, unit)
+                val expiresAt = forecast.temperatures.keys.sorted().drop(1).firstOrNull()
+                    ?: Clock.System.now()
+
+                forecast to expiresAt
+            }
+        }
 
         provide<WeatherService> {
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-            val service = resolve<OpenWeatherMapWeatherService>()
+            val service = resolve<RedisCachingWeatherService>()
 
-            MemoryCachingWeatherService(scope) { string: String, unit: TemperatureUnit ->
-                val forecast = service.getForecast(string, unit)
+            MemoryCachingWeatherService(scope) { location: String, unit: TemperatureUnit ->
+                val forecast = service.getForecast(location, unit)
 
                 // Temperatures are assumed to be sorted by the service, but we sort it anyway
                 val nextUpdateTimestamp = forecast.temperatures.keys.sorted().drop(1).firstOrNull()

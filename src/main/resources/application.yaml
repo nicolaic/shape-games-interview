@@ -7,3 +7,6 @@ ktor:
 
 openWeatherMap:
   apiKey: $OPEN_WEATHER_MAP_API_KEY
+
+redis:
+  url: $REDIS_URL
