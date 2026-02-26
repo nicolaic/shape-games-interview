@@ -11,11 +11,12 @@ import kotlinx.coroutines.async
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.TimeMark
 
-typealias WeatherForecastLoader = suspend (location: String, unit: TemperatureUnit) -> Pair<WeatherForecast, TimeMark>
+typealias MemoryWeatherForecastLoader =
+        suspend (location: String, unit: TemperatureUnit) -> Pair<WeatherForecast, TimeMark>
 
 class MemoryCachingWeatherService(
     private val scope: CoroutineScope,
-    private val loader: WeatherForecastLoader,
+    private val loader: MemoryWeatherForecastLoader,
 ) : WeatherService {
     private val cache = ConcurrentHashMap<WeatherCacheKey, Deferred<CacheEntry<WeatherForecast>>>()
 

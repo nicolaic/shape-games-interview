@@ -28,6 +28,8 @@ dependencies {
     implementation(libs.ktor.client.cio)
     implementation(libs.ktor.client.content.negotiation)
 
+    implementation(libs.lettuce.core)
+
     implementation(libs.logback.classic)
     implementation("io.ktor:ktor-serialization-kotlinx-cbor:3.4.0")
     testImplementation(libs.ktor.server.test.host)
