@@ -16,6 +16,7 @@ import io.ktor.server.routing.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.TimeSource
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation as ClientContentNegotiation
@@ -67,7 +68,13 @@ fun Application.configureDependencies() {
             val service = resolve<OpenWeatherMapWeatherService>()
 
             MemoryCachingWeatherService(scope) { string: String, unit: TemperatureUnit ->
-                service.getForecast(string, unit) to TimeSource.Monotonic.markNow() + 3.hours
+                val forecast = service.getForecast(string, unit)
+
+                // Temperatures are assumed to be sorted by the service, but we sort it anyway
+                val nextUpdateTimestamp = forecast.temperatures.keys.sorted().drop(1).firstOrNull()
+                val cacheExpiresIn = nextUpdateTimestamp?.minus(Clock.System.now()) ?: 3.hours
+
+                forecast to TimeSource.Monotonic.markNow() + cacheExpiresIn
             }
         }
     }
