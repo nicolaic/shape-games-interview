@@ -1,7 +1,9 @@
 package dev.nicolai.weather
 
+import dev.nicolai.weather.model.TemperatureUnit
 import dev.nicolai.weather.routes.byLocation
 import dev.nicolai.weather.routes.summary
+import dev.nicolai.weather.service.MemoryCachingWeatherService
 import dev.nicolai.weather.service.OpenWeatherMapWeatherService
 import dev.nicolai.weather.service.WeatherService
 import io.ktor.client.*
@@ -11,6 +13,11 @@ import io.ktor.server.application.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.di.*
 import io.ktor.server.routing.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.TimeSource
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation as ClientContentNegotiation
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
 
@@ -53,6 +60,15 @@ fun Application.configureDependencies() {
             }
         }
 
-        provide<WeatherService>(OpenWeatherMapWeatherService::class)
+        provide(OpenWeatherMapWeatherService::class)
+
+        provide<WeatherService> {
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+            val service = resolve<OpenWeatherMapWeatherService>()
+
+            MemoryCachingWeatherService(scope) { string: String, unit: TemperatureUnit ->
+                service.getForecast(string, unit) to TimeSource.Monotonic.markNow() + 3.hours
+            }
+        }
     }
 }
